@@ -7,12 +7,25 @@
 
 use v6;
 
-subset FechaVálida of Str where * ~~ / \d**4 '-' \d**2 '-' \d**2 /; 
+my token amd { ^  \d**4  '-'  \d**2  '-'  \d**2  $ } # AAAA-MM-DD
+my token dma { ^ (\d**2) '-' (\d**2) '-' (\d**4) $ } # DD-MM-AAAA
+my token fecha { <amd> || <dma> }                    # AAAA-MM-DD o DD-MM-AAAA 
+
+subset FechaVálida of Str where * ~~ / <fecha> /; 
+
 
 sub MAIN(FechaVálida $desde-fecha, $hasta-fecha = Date.today, Bool :$torrents) { 
-    my $fecha-inicial = Date.new($desde-fecha);
-    my $fecha-final   = Date.new($hasta-fecha);
 
+    my $fecha-inicial = $desde-fecha;
+    my $fecha-final   = $hasta-fecha;
+
+    for $fecha-inicial, $fecha-final { 
+        if $_ ~~ / <dma> / { s/ <dma> /$<dma>[2]-$<dma>[1]-$<dma>[0]/ }
+    } 
+
+    $fecha-inicial = Date.new($fecha-inicial);
+    $fecha-final   = Date.new($fecha-final);
+ 
     if $fecha-inicial lt $fecha-final {
         until $fecha-inicial eq $fecha-final {
             my $año = $fecha-inicial.year;
@@ -30,6 +43,6 @@ sub MAIN(FechaVálida $desde-fecha, $hasta-fecha = Date.today, Bool :$torrents) 
         }
     }
     else {
-        say "$fecha-inicial no puede ser mayor que $fecha-final";
+        say "$fecha-inicial no debería ser mayor o igual a $fecha-final";
     }
 }
