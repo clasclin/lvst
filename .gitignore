@@ -1,2 +1,4 @@
-lib/*
+lib/.precomp/*
+!lib
 *swp
+.precomp/*

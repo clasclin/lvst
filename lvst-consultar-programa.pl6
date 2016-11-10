@@ -6,15 +6,19 @@
 #
 
 use v6;
+use lib 'lib';
+use Fechas;
 
+sub MAIN(FechaVálida $fecha?) {
 
-sub MAIN($fecha?) {
-
+    my $dir-venganzas = "%*ENV<HOME>/Música/lvst/venganza";
     my $año;
+
     with $fecha {
-        $año = Date.new($fecha).year.Str;
-        my $venganzas = "%*ENV<HOME>/Música/lvst/venganza{$año}";
-        my $audio = join '/', $venganzas, "lavenganza_$fecha.ogg";
+        my $yyyy-mm-dd = convertir-fecha($fecha); 
+        $año = Date.new($yyyy-mm-dd).year.Str;
+        my $venganzas = join '', $dir-venganzas, $año;
+        my $audio = join '/', $venganzas, "lavenganza_$yyyy-mm-dd.ogg";
 
         "$audio".IO.f
             ?? say "Existe" 
@@ -23,8 +27,7 @@ sub MAIN($fecha?) {
      
     without $fecha {
         $año = Date.today.year().Str;
-
-        my $venganzas = "%*ENV<HOME>/Música/lvst/venganza{$año}";
+        my $venganzas = join '', $dir-venganzas, $año;
 
         if "$venganzas".IO.d {
 
