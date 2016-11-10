@@ -7,9 +7,9 @@
 
 use v6;
 
-my token amd { ^  \d**4  '-'  \d**2  '-'  \d**2  $ } # AAAA-MM-DD
-my token dma { ^ (\d**2) '-' (\d**2) '-' (\d**4) $ } # DD-MM-AAAA
-my token fecha { <amd> || <dma> }                    # AAAA-MM-DD o DD-MM-AAAA 
+my token amd { ^  \d**4  '-'  \d**2  '-'  \d**2  $ }; # AAAA-MM-DD
+my token dma { ^ (\d**2) '-' (\d**2) '-' (\d**4) $ }; # DD-MM-AAAA
+my token fecha { <amd> || <dma> || <ult> };           # AAAA-MM-DD o DD-MM-AAAA 
 
 subset FechaVálida of Str where * ~~ / <fecha> /; 
 
