@@ -37,7 +37,7 @@ que el programa tenga errores.
  
 ## Uso
 
-```perl6
+```bash
 # la ayuda se obtiene con:
 
 $ lvst --help
