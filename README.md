@@ -20,7 +20,7 @@ Antes de empezar quiero aclarar que supociones hice:
  - se usa 'wget' para descargar los torrents
  - se usa 'dir2ogg' para convertir de mp3 a ogg
  - la estructura de directorios en la que se guardan los audios es por años
-
+ ```
    venganzas/
    |
    |__ 2016
@@ -29,7 +29,7 @@ Antes de empezar quiero aclarar que supociones hice:
    |
    |__ 2017
        |__ lavenganza_2017-01-01.ogg
-
+ ```
 esto es así no por capricho sino por limitaciones o falta de experiencia de mi
 parte. Por ahora no es sencillo reemplazar wget, dir2ogg, o la estructura de
 directorios sin tener que cambiar el código del programa. También es de esperar
@@ -37,7 +37,7 @@ que el programa tenga errores.
  
 ## Uso
 
-```
+```perl6
 # la ayuda se obtiene con:
 
 $ lvst --help
