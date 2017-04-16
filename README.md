@@ -1,143 +1,77 @@
 # lvst (la venganza será terrible). 
 
-lvst contiene una serie de scripts que descargan archivos de audios del programa
-de radio "La Venganza Será Terrible". Tanto la descarga directa (requiere wget)
-o bien se le puede pedir los enlaces torrents.
+El proyecto lvst contiene un script que descarga torrents del programa de
+radio "La Venganza Será Terrible" 
+'https://es.wikipedia.org/wiki/La_venganza_ser%C3%A1_terrible'.
 
 El sitio desde el cual se descargan los audios es: 
 'https://venganzasdelpasado.com.ar/' y pueden encontrar el proyecto que genera
 la página en: 'https://github.com/jschwindt/Venganzas-del-Pasado'
 
-La idea es básicamente tener un script principal que se ocupa de comprobar cual
-es el último archivo en disco y de ser necesario generar un rango de enlaces de 
-los torrents que faltan, luego descargarlos y en un futuro pasarlos a un formato
-abierto como es ogg.
+# Descripción y uso del script.
 
-En lugar de tener un solo programa que se ocupe de todo preferí tener varios que
-cumplan determinadas tareas, debido a esto puede que existan ciertas redundancias
-innecesarias o variables duplicadas.
+La idea es básicamente tener un script que se ocupa de comprobar cual es el
+último archivo en disco y de ser necesario generar un rango de enlaces de 
+los torrents que faltan para ser descargados, luego se procede a descargar
+los audios con el cliente torrent que se desee. Una vez descargados los audios
+se usa un programa externo para convertir los audios a ogg.
 
-# Descripción y uso de los scripts.
+Antes de empezar quiero aclarar que supociones hice:
+ - se usa 'wget' para descargar los torrents
+ - se usa 'dir2ogg' para convertir de mp3 a ogg
+ - la estructura de directorios en la que se guardan los audios es por años
 
-## lvst.pl6
+   venganzas/
+   |
+   |__ 2016
+   |   |__ ...
+   |   |__ ...
+   |
+   |__ 2017
+       |__ lavenganza_2017-01-01.ogg
 
-Es el programa principal, el encargado de juntar las partes para descargar los
-torrents faltantes. En caso de ser la primera vez en descargar archivos convien
-ver como utilizar 'venganzas-del-pasado.pl6'
-
-### Uso
+esto es así no por capricho sino por limitaciones o falta de experiencia de mi
+parte. Por ahora no es sencillo reemplazar wget, dir2ogg, o la estructura de
+directorios sin tener que cambiar el código del programa. También es de esperar
+que el programa tenga errores.
+ 
+## Uso
 
 ```
 # la ayuda se obtiene con:
-$ lvst.pl6 --help
-Usage:
-  lvst.pl6 [--nono] [<guardar-en>] [<buscar-en>]
 
-# con el argumento '[--nono]' muestra los comandos empleados en la descarga.
-$ lvst.pl6 --nono
+$ lvst --help
+Usage:
+  lvst.pl6 [--nono] 
+  lvst.pl6 [--nono] <buscar-en> <guardar-en> 
+  lvst.pl6 [--desde-fecha=<Str>] [--hasta-fecha=<Str>] [--descargar]
+
+# con el argumento '[--nono]' genera el rango de fechas que faltan en disco
+# y muestra los enlaces sin descargar los torrents
+ 
+$ lvst --nono
 ...
 wget http://s3.schwindt.org/dolina/AAAA/lavenganza_AAAA-MM-DD.mp3?torrent
 ...
 
-# con el argumento '[<guardar-en>]' se le indica el lugar donde se quieren
-# almacenar los torrents.
-$ lvst.pl6 ~/Descargas/torrents
+# sin argumentos se encarga de generar el rango de fechas desde el último audio
+# disponible en disco, se convierten los mp3 y se procede a descargar los torrents
+# que faltan hasta el día de hoy
 
-# con el argumento '[<buscar-en>]' se le indica el directorio el cual ya
-# contiene audios anteriores.
-$ lvst.pl6 <guardar-en> ~/Música/lvst 
+$ lvst
+Nada por hacer
 
-# lo más sencillo sería modificar las variables ($descargas, $dir-audios) en
-# el propio código para que apunten a los directorios correspondientes
-```
-
-## lvst-copiar-mp3.pl6
-
-Se ocupa de renombrar los archivos descargados desde origen y copiarlos al 
-destino ($org, $dst) siempre y cuando no exista el audio.
-
-### Uso
-
-```
-# ayuda 
-$ lvst-copiar-mp3.pl6 --help
-Usage:
-  lvst-copiar-mp3.pl6 [--quitar=<Any>] <archivo>
-  lvst-copiar-mp3.pl6 [--quitar=<Any>] [--nono]
-
-# el argumento '<archivo>' es obligatorio y está pensado para ser usado por 
-# por el cliente bittorrent.
-$ lvst-copiar-mp3.pl6 dolina_AAA_lavenganza_AAA-MM-DD.mp3
-
-# el argumento '[--quitar]' permite modificar la parte que tiene que eliminar
-# del audio, por defecto se elimina 'dolina_AAA_'
-# audio descargado de torrent: 'dolina_AAA_lavenganza_AAA-MM-DD.mp3'
-# audio renombrado: 'lavenganza_AAA-MM-DD.mp3'
-$ lvst-copiar-mp3.pl6 --quitar='dolina_' <archivo>
-
-# el argumento '[--nono]' es opcional y simula el copiar y pegar 
-$ lvst-copiar-mp3.pl6 --nono <archivo>
-```
-
-## lvst-consultar-programa.pl6
-
-Se ocupa de dos tareas, bien puede entregar el día posterior al último archivo
-en disco o bien comprueba la existencia de dicho archivo.
-
-### Uso
-
-```
-# la ayuda indica que hay dos maneras posibles de llamarlo: bien sea con una 
-# fecha obligatoria o bien se le puede indicar en donde buscar (véase <buscar-en>
-# del ejemplo anterior).
-$ lvst-consultar-programa.pl6 --help
-Usage:
-  lvst-consultar-programa.pl6 <fecha>
-  lvst-consultar-programa.pl6 [<buscar-en>]
-
-# sin argumentos devuelve la fecha posterior al último programa
-$ lvst-consultar-programa.pl6
-AAAA-MM-DD
-
-# con el argumento '<fecha>' indica 'Existe' o 'No existe'
-$ lvst-consultar-programa.pl6 AAAA-MM-DD
-No existe
-```
+# con los argumentos opcionales '<buscar-en>' '<guardar-en>' se le indican los
+# directorios en los cuales buscar los audios presentes y donde guardar los
+# torrents.
  
-## venganzas-del-pasado.pl6
+$ lvst ~/Música/venganzas/ ~/Descargas/torrents/
 
-Se ocupa de generar los enlaces (torrents o descarga directa) según se lo requiera. 
-El programa permite que se le pasen dos fechas, la primera es obligatoria, mientras
-que la segunda se puede omitir, en ese caso la segunda fecha queda establecida como
-hoy. El formato usado para las fechas puede ser AAAA-MM-DD o bien DD-MM-AAAA.
+# con los argumentos '[--desde-fecha]' '[--hasta-fecha]' puedo crear un rango 
+# de días que faltan y me va a mostrar las urls de ese periodo de tiempo
 
-### Uso.
-
-```
-# la ayuda:
-$ venganzas-del-pasado.pl6 --help 
-Usage:
-  venganzas-del-pasado.pl6 [--torrents] <desde-fecha> [<hasta-fecha>] 
-
-# el argumento '<desde-fecha>' es obligatorio.
-$ venganzas-del-pasado.pl6 AAA-MM-DD
-
-# opcionalmente se puede pasar '<hasta-fecha>'.
-$ venganzas-del-pasado.pl6 AAAA-MM-DD AAAA-MM-DD
-
-# con el argumento '[--torrents]' genera los enlaces para descargar torrents.
-$ venganzas-del-pasado.pl6 --torrents <desde-fecha> <hasta-fecha>
-
-# si son pocos audios se puede usar
-$ venganzas-del-pasado.pl6 AAAA-MM-DD | wget --limit-rate 90k -i -
-
-# si el rango de fechas es amplio tal vez convenga
-for mp3 in $(venganzas-del-pasado.pl6 AAAA-MM-DD)
-do
-  sleep 2;
-  wget --limit-rate 90k "$mp3";
-done
-
-# otra opción es simplemente guardar en un archivo para luego realizar la descarga
-$ venganzas-del-pasado.pl6 AAAA-MM-DD > venganzas-mp3.txt 
+$ lvst --desde-fecha=2016-12-31 --hasta-fecha=2017-01-05
+http://s3.schwindt.org/dolina/2017/lavenganza_2017-01-02.mp3?torrent
+http://s3.schwindt.org/dolina/2017/lavenganza_2017-01-03.mp3?torrent
+http://s3.schwindt.org/dolina/2017/lavenganza_2017-01-04.mp3?torrent
 ```

@@ -1,0 +1,128 @@
+#!/usr/bin/env perl6
+#
+# lvst - pretende reemplazar al conjunto de scripts anteriores
+#        lvst.pl6, venganzas-del-pasado.pl6, lvst-copiar-mp3.pl6
+#        lvst-consultar-programa.pl6.
+
+use v6;
+
+
+class Venganzas {
+    has $.guardar-en-dir;
+    has $.buscar-en-dir;
+    has @.programas;
+    has @.para-descarga;
+    has @!a-convertir;
+
+    submethod BUILD (
+            :$!buscar-en-dir  = "$*HOME/Música/lvst",
+            :$!guardar-en-dir = "$*HOME/Descargas/torrents"
+        ) {
+        chdir $!guardar-en-dir or die "$!";
+    }
+
+    method !venganzas-locales () {
+        my @directorios = $!buscar-en-dir.IO;
+        while @directorios {
+            for @directorios.pop.dir -> $ruta {
+                @!programas.push: $ruta.basename if $ruta.extension eq 'ogg';
+                @directorios.push: $ruta if $ruta.d;
+            }
+        }
+    }
+
+    method último-programa () {
+        self!venganzas-locales;
+        return @!programas.sort.tail.split('_')[1].split('.')[0].trim;
+    }
+
+    method venganzas-del-pasado ($desde is copy, $hasta is copy, Bool $mostrar) {
+        $desde = Date.new($desde);
+        $hasta = Date.new($hasta);
+        my $url = 'http://s3.schwindt.org/dolina';
+        if $desde lt $hasta {
+            until $desde eq $hasta {
+                unless $desde.day-of-week == 6|7 {
+                    my $torrent = join '/', $url, $desde.year,
+                        "lavenganza_$desde.mp3?torrent";
+                    self.para-descarga.push: $torrent;
+                    #say $torrent if $mostrar;
+                }
+                $desde .= later(:1day);
+            }
+            return self.para-descarga if $mostrar;
+        }
+    }
+
+    method descargar-programas () {
+        for @!para-descarga -> $url {
+            my $archivo = $url.split('/').tail;
+            shell "wget $url" unless $archivo.IO.e;
+        }
+    }
+
+    method copiar-programas () {
+        self!venganzas-locales unless @!programas;
+        my @ogg = @!programas.sort>>.split('_')[*;1]>>.split('.')[*;0];
+        my @mp3 = $!guardar-en-dir.IO.dir(test => /:i '.mp3' $/)>>.basename>>\
+            .split('_')[*;*-1]>>.split('.')[*;0].sort;
+        my %aux = map { $_ => 1}, @ogg;
+        my @mp3-a-ogg = grep { %aux{$_}:!exists }, @mp3;
+
+        if @mp3-a-ogg.elems > 0 {
+            say "Convirtiendo y copiando archivos...";
+
+            for @mp3-a-ogg -> $fecha {
+                my $año = $fecha.split('-')[0];
+                my $mp3 = $!guardar-en-dir ~ '/dolina_' ~ $año ~ '_lavenganza_' ~
+                    $fecha ~ '.mp3';
+                my $ogg = $!buscar-en-dir ~ '/' ~ $año ~ '/' ~ 'lavenganza_' ~
+                    $fecha ~ '.ogg';
+                shell "dir2ogg --smart-mp3 --no-pipe $mp3";
+                move($mp3.subst('.mp3', '.ogg'), $ogg, :createonly);
+            }
+        }
+    }
+}
+
+
+sub lvst (Venganzas $podcast, Bool $nono) {
+
+    my $último = Date.new($podcast.último-programa).later(:1day).Str;
+    my $hoy    = Date.today.Str;
+
+    if $nono {
+        say "wget $_" for $podcast.venganzas-del-pasado($último, $hoy, True); 
+    } else {
+        $podcast.venganzas-del-pasado($último, $hoy, False);
+        if $podcast.para-descarga.elems > 0 {
+            $podcast.copiar-programas; 
+            $podcast.descargar-programas;
+        } else {
+            say "Nada por hacer";
+        }
+    } 
+}
+
+multi sub MAIN (Bool :$nono) {
+    my $podcast = Venganzas.new;
+    lvst($podcast, $nono);
+}
+
+multi sub MAIN (Str $buscar-en, Str $guardar-en, Bool :$nono) {
+    my $podcast = Venganzas.new(
+        buscar-en-dir  => $buscar-en,
+        guardar-en-dir => $guardar-en
+        );
+    lvst($podcast, $nono);
+}
+
+multi sub MAIN (Str :$desde-fecha, Str :$hasta-fecha, Bool :$descargar) {
+    my $podcast = Venganzas.new;
+    if $descargar {
+        $podcast.venganzas-del-pasado($desde-fecha, $hasta-fecha, False);
+        $podcast.descargar-programas;
+    } else {
+        .say for $podcast.venganzas-del-pasado($desde-fecha, $hasta-fecha, True);
+    }
+}
