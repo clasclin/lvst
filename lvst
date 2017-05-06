@@ -9,7 +9,7 @@ use v6;
 
 
 my $ogg = "$*HOME/Música/lvst";
-my $mp3 = "$*HOME/Descargas/torrents";
+my $mp3 = "$*HOME/Descargas/torrents/venganzas-del-pasado";
 
 
 class Audio {
@@ -30,38 +30,34 @@ class Programas {
 
    method buscar-audios ($buscar-en) {
        my @directorios = $buscar-en.IO;
-       while @directorios { 
+       while @directorios {
            for @directorios.pop.dir -> $audio {
-               if $audio ~~  / ['.mp3' || '.ogg'] $/ {
-                  my Str $nombre          = $audio.basename;
-                  my Str $extensión       = $audio.extension;
-                  my IO::Path $directorio = $audio.dirname.IO;
-                  my (Date $fecha, Str $año, Str $mes, Str $día) = 
-                    Date.new(~$<fecha>), ~$<fecha><año>, 
-                    ~$<fecha><mes>, ~$<fecha><día>
-                    if $nombre ~~ /
-                      [ 'dolina_' \d**4 '_'  ||  'lavenganza_' ]
-                      $<fecha> = ( 
-                        $<año> = ( \d**4 ) '-'
-                        $<mes> = ( \d**2 ) '-'
-                        $<día> = ( \d**2 )
-                      )
-                      [        '_' \d+       ]?
-                      [   '.ogg' || '.mp3'   ]
-                    /;
-                  my Int $tamaño    = $audio.IO.s; 
-                  my Str $metadatos = ''; 
+               if $audio.f {
+                   if $audio.ends-with('.ogg') or $audio.ends-with('.mp3') {
+                       my Str $nombre          = $audio.basename;
+                       my Str $extensión       = $audio.extension;
+                       my IO::Path $directorio = $audio.dirname.IO;
+                       my Str $fecha           = ~$0 if $nombre ~~ /
+                           [ 'dolina_' \d**4 '_'  ||  'lavenganza_' ]
+                           (       \d**4 '-' \d**2 '-' \d**2        )
+                           [ '_' \d+ ]?          [ '.ogg' || '.mp3' ]
+                           $/;
+                       my (Str $año, Str $mes, Str $día) = ~$0, ~$1, ~$2
+                           if $fecha ~~ /
+                           ( \d**4 ) '-' ( \d**2 ) '-' ( \d**2 ) /;
+                       my Int $tamaño = $audio.IO.s;
 
-                  @!programas.push: Audio.new(
-                      :nombre($nombre),
-                      :ubicación($directorio),
-                      :extensión($extensión),
-                      :fecha($fecha),
-                      :año($año),
-                      :mes($mes),
-                      :día($día),
-                      :tamaño($tamaño),
-                  );
+                       @!programas.push: Audio.new(
+                           :nombre($nombre),
+                           :ubicación($directorio),
+                           :extensión($extensión),
+                           :fecha(Date.new($fecha)),
+                           :año($año),
+                           :mes($mes),
+                           :día($día),
+                           :tamaño($tamaño),
+                           );
+                   }
                }
                @directorios.push: $audio if $audio.d;
            }
@@ -94,10 +90,12 @@ class Programas {
 
    method descargar (Bool :$descarga-directa, Bool :$simular) {
        # descarga los programas pendientes
+       chdir $mp3 or die "$!";
+       say "Descargando...";
 
        for @!pendientes -> Date $fecha {
            my Str $url     = 'http://s3.schwindt.org/dolina/';
-           my Str $archivo = 'lavenganza_' ~ $fecha ~ '.mp3?torrent'; 
+           my Str $archivo = 'lavenganza_' ~ $fecha ~ '.mp3?torrent';
 
            if $descarga-directa {
                $url = 'https://venganzasdelpasado.com.ar/';
@@ -106,14 +104,18 @@ class Programas {
 
            my $url-completa = $url ~ $fecha.year ~ '/' ~ $archivo;
 
-           $simular
-               ?? say "simulando: $url-completa"
-               !! shell "echo wget $url-completa";
+           say "simulando: wget $url-completa" if $simular;
+
+           unless $archivo.IO.f {
+               shell "wget $url-completa";
+               sleep 3;
+           }
        }
    }
 
-   method mp3-a-ogg () { 
+   method mp3-a-ogg () {
        # convierte, renombra y copia los mp3
+       say "Convirtiendo a ogg...";
 
        my Audio @mp3 = grep { .extensión eq 'mp3' }, @!programas;
        my Audio @ogg = grep { .extensión eq 'ogg' }, @!programas;
@@ -124,7 +126,7 @@ class Programas {
        map { %mp3{$_}:delete if %ogg{$_}:exists }, %mp3.keys.sort;
 
        for %mp3.values -> $audio {
-           my $origen  = $audio.ubicación ~ '/' ~ $audio.nombre; 
+           my $origen  = $audio.ubicación ~ '/' ~ $audio.nombre;
            my $nombre  = $audio.nombre.subst('dolina_' ~ $audio.año ~ '_', '')\
                          .subst($audio.extensión, 'ogg');
            my $destino = $ogg ~ '/' ~  $audio.año;
@@ -134,7 +136,7 @@ class Programas {
 
            my @trabajos;
            unless $destino.IO.f {
-               my $proc = Proc::Async.new('mp3-a-ogg.sh', $origen, $destino); 
+               my $proc = Proc::Async.new('mp3-a-ogg.sh', $origen, $destino);
                push @trabajos, $proc.start;
 
                if @trabajos == 3 {
@@ -146,52 +148,57 @@ class Programas {
            await @trabajos;
        }
    }
+
+   submethod BUILD () {
+       self.buscar-audios($ogg);
+       self.buscar-audios($mp3);
+   }
 }
 
 
-multi sub MAIN (Bool :$nono) {
-    if $ogg.IO.d && $mp3.IO.d {
-        my $venganzas = Programas.new;
+multi sub MAIN (Bool :$nono, Bool :$descarga-directa) {
 
-        $venganzas.buscar-audios($ogg);
-        $venganzas.buscar-audios($mp3);
+    my $venganzas = Programas.new;
 
-        $venganzas.mp3-a-ogg unless $nono;
+    my $último = $venganzas.último-programa;
+    my $hoy    = Date.today;
 
-        my $último = $venganzas.último-programa;
-        my $hoy    = Date.today;
+    $venganzas.mp3-a-ogg; 
+    $venganzas.del-pasado($último, $hoy);
 
-        $venganzas.del-pasado($último, $hoy);
-
-        $nono
-            ?? $venganzas.descargar(:simular)
-            !! $venganzas.descargar;
-
+    if $nono {
+        $descarga-directa 
+            ?? $venganzas.descargar(:simular, :descarga-directa)
+            !! $venganzas.descargar(:simular);
     } else {
-        note "$mp3 ¡NO ES UN DIRECTORIO!";
-        note "$ogg ¡NO ES UN DIRECTORIO!";
-        exit 1;
+        $descarga-directa
+            ?? $venganzas.descargar(:descarga-directa)
+            !! $venganzas.descargar;
     }
 }
 
 
 multi sub MAIN (
-        $desde-fecha,
-        $hasta-fecha,
-        Bool :$no-filtrar,
+        Str $desde-fecha!,
+        Str $hasta-fecha?,
+        Bool :$nono,
         Bool :$descarga-directa,
-        Bool :$nono
+        Bool :$no-filtrar
     ) {
 
-    my $desde = Date.new($desde-fecha); 
-    my $hasta = Date.new($hasta-fecha);
+    my $desde = Date.new($desde-fecha);
+    my $hasta;
 
-    my $venganzas = Programas.new; 
+    $hasta-fecha 
+       ?? ($hasta = Date.new($hasta-fecha))
+       !! ($hasta = Date.today);
 
-    $venganzas.buscar-audios($ogg);
-    $venganzas.buscar-audios($mp3);
+    my $venganzas = Programas.new;
 
-    $no-filtrar 
+    $venganzas.mp3-a-ogg;
+    $venganzas.del-pasado($desde, $hasta) unless $nono;
+
+    $no-filtrar
         ?? $venganzas.del-pasado($desde, $hasta, :sin-filtro)
         !! $venganzas.del-pasado($desde, $hasta);
 
