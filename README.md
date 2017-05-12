@@ -1,17 +1,18 @@
 # lvst (la venganza será terrible). 
 
 El proyecto lvst contiene un script que ayuda a la descarga del programa de
-radio [La Venganza Será Terrible]
-(https://es.wikipedia.org/wiki/La_venganza_ser%C3%A1_terrible).
+radio
+[La Venganza Será Terrible](https://es.wikipedia.org/wiki/La_venganza_ser%C3%A1_terrible).
 
-El sitio desde el cual se descargan los audios es [venganzas del pasado] 
-(https://venganzasdelpasado.com.ar/) y pueden encontrar el proyecto como
+El sitio desde el cual se descargan los audios es
+[venganzas del pasado](https://venganzasdelpasado.com.ar/) y pueden encontrar
+el proyecto como
 [venganzas-del-pasado](https://github.com/jschwindt/Venganzas-del-Pasado).
 
 ## Descripción y uso del script.
 
 La idea es básicamente tener un script que se ocupa de comprobar cual es el
-último archivo en disco y descarga los atchivos torrents que faltan o los audios
+último archivo en disco y descarga los archivos torrents que faltan o los audios
 según se lo requiera. 
 
 Parto de la siguiente estrucutura de directorios en la que se guardan los archivos:
@@ -36,6 +37,14 @@ Mientras que los archivos descargados se guardan en:
   |__ ...
   |__ ...
 ```
+En ambos casos los directorios se pueden cambiar desde el archivo de configuración
+que se genera en `~/.lvst`
+
+## Hoja de ruta
+
+ * ~~La configuración se realiza mediante un archivo de texto~~
+ * ~~Los archivos se convierten en el fondo liberando la consola~~
+ * Buscar un reemplazo del script en bash que funcione en windows
 
 ## Ejemplos 
 
@@ -44,8 +53,7 @@ Mientras que los archivos descargados se guardan en:
 
 $ lvst --help
 Usage:
-  lvst [--nono] [--descarga-directa] [--no-filtrar] [--convertir-a-ogg]
-  [<desde-fecha>] [<hasta-fecha>] 
+  lvst [--nono] [--descarga-directa] [--no-filtrar] [--convertir-a-ogg] [<desde-fecha>] [<hasta-fecha>] 
 
 # con el argumento '[--nono]' genera el rango de fechas que faltan en disco
 # y muestra los enlaces sin descargar los torrents
