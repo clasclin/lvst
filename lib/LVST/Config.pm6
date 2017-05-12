@@ -1,10 +1,8 @@
-use v6;
-
-unit module Config;
+unit module LVST::Config;
 
 
 #| clase que ayuda con los datos de configuración
-class LVST::Configuración {
+class Config is export {
 
     has %.variables;
 
@@ -50,6 +48,9 @@ class LVST::Configuración {
             unless $config.IO.e;
 
         %!variables := leer-configuración($config);
+
+        our $mp3     = %!variables{'archivos.descargados'};
+        our $ogg     = %!variables{'archivos.locales'};
 
     }
 } 
