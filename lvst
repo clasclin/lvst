@@ -19,19 +19,18 @@ use LVST;
 
 
 sub MAIN (
-        Str $desde-fecha?,
-        Str $hasta-fecha?,
-        Bool :$nono,
-        Bool :$descarga-directa,
-        Bool :$no-filtrar,
-        Bool :$convertir-a-ogg
-    ) {
-
+    Str $desde-fecha?,
+    Str $hasta-fecha?,
+    Bool :$nono,
+    Bool :$descarga-directa,
+    Bool :$no-filtrar,
+    Bool :$convertir-a-ogg)
+{
     my $venganzas = LVST::Venganzas.new;
 
     my $desde =  $desde-fecha
               ?? Date.new($desde-fecha)
-              !! $venganzas.último-programa; 
+              !! $venganzas.último-programa.succ; 
 
     my $hasta =  $hasta-fecha 
               ?? Date.new($hasta-fecha)
@@ -45,17 +44,12 @@ sub MAIN (
         !! $venganzas.del-pasado($desde, $hasta);
 
     if $nono {
-
         $descarga-directa
             ?? $venganzas.descargar(:simular, :descarga-directa)
             !! $venganzas.descargar(:simular);
-
     } else {
-
         $descarga-directa
             ?? $venganzas.descargar(:descarga-directa)
             !! $venganzas.descargar;
-
     }
-
 }
