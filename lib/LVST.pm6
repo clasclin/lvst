@@ -106,7 +106,7 @@ class LVST::Venganzas {
            unless $file-name.IO.f {
                unless $simular {
                    once { say "Descargando..." }
-                   shell "wget $url";
+                   run 'wget', $url;
                    sleep 3;
                }
            }
