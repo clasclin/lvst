@@ -6,151 +6,135 @@ Config.new;
 
 
 class LVST::Audio {
-
     has $.name;
-    has $.path;
-    has $.year;
-    has $.month;
-    has $.day;
+    has $.src;
+    has $.dst;
+    has $.date;
     has $.size;
+    has $.ext;
 
-    method change-ext () {
-        $!name .= subst('dolina_' ~ $!year ~ '_', '');
-        $!name .= subst('mp3', 'ogg');
+    method download (Bool $simular?) {
+        my $base-url = 'http://s3.schwindt.org/dolina/';
+        my $url = $base-url ~ $!date.year ~ '/' ~ $!name ~ '?torrent';
+        say "--> $url" if $simular;
+        unless $simular { 
+            run 'wget', $url;
+        }
+    }
+
+    method rename-file {
+        $!name.subst($!name, "lavenganza_$!date.ogg");
     }
 }
 
 
 class LVST::Venganzas {
+    has %.audios;
+    has @.to-download;
+    has @.to-ogg;
 
-   has %!audios-ogg;
-   has %!audios-mp3;
-   has @!missing;
+    method buscar-audios ($path) {
+        my @stack = $path.IO;
+        my @audio-files = lazy gather while @stack {
+            with @stack.pop {
+                 when :d { @stack.append: .dir }
+                 when .extension eq 'ogg'|'mp3' {
+                     .take;
+                 }
+            }
+        }
+        for @audio-files -> $audio {
+            my $name = $audio.basename;
+            my $src  = $audio.dirname;
+            my $date = Date.new(~$0) 
+                if $name ~~ / .+? ( \d**4 '-' \d**2 '-' \d**2 ) .+? /;
+            my $dst  = "$Config::ogg/{$date.year}";
+            my $size = $audio.IO.s; 
+            my $ext  = $audio.extension;
 
-   method !buscar-audios ($path, $save-in) {
-       my @stack = $path.IO;
+            %!audios.push: 
+                $ext => LVST::Audio.new(:$name, :$src, :$dst, :$date, :$size, :$ext);
+        } 
+    }
 
-       my $audio-files = gather while @stack {
-           with @stack.pop {
-                when :d { @stack.append: .dir }
-                when .extension eq 'ogg' or .extension eq 'mp3' {
-                    .take;
+    method último-programa ($ext = 'ogg') {
+        %!audios{$ext}>>.date.sort.tail;
+    }
+
+    method del-pasado (Date $desde! is copy, Date $hasta! is copy) {
+        if $desde lt $hasta {
+            my @fechas = lazy gather {
+                until $desde eq $hasta {
+                    # sábado y domingo no hay programa
+                    unless $desde.day-of-week == 6|7 { 
+                        take $desde;
+                    }
+                    $desde .= later(:1day);
                 }
-           }
-       }
+            }
+            for @fechas -> $date {
+                if any(%!audios{'ogg'}>>.date) {
+                    @!to-download.push: LVST::Audio.new(
+                        name => "lavenganza_$date.mp3",
+                        src  => $Config::mp3,
+                        dst  => "$Config::ogg/{$date.year}",
+                        :$date,
+                    );
+                }
+            }
+        } else {
+            note "'$desde' tiene que ser menor que '$hasta'";
+        }
+    }
 
-       $audio-files.map(&create-audio);
+    method descargar (Bool :$simular) {
+        say "simulando descargas" if $simular;
+        for @!to-download -> $audio {
+            if $simular {
+                $audio.download($simular);
+            }
+            else {
+                indir $Config::mp3, {
+                    unless "{$audio.src}/{$audio.name}?torrent".IO.e {
+                        my $wget = $audio.download;
+                        sleep 2;
+                        next if $wget.exitcode != 0; 
+                    }
+                }
+            }
+        }
+    }
 
-       sub create-audio ($audio) {
-           my $name = $audio.basename;
-           my $path = $audio.dirname;
-           my $date = ~$0 
-               if $name ~~ /
-                   [ 'dolina_' \d**4 '_'  ||  'lavenganza_' ]
-                   (       \d**4 '-' \d**2 '-' \d**2        )
-                   [ '_' \d+ ]?          [ '.ogg' || '.mp3' ] $/;
+    method mp3-a-ogg {
+        my %mp3 = map { .date => $_ }, %!audios{'mp3'}.flat;
+        my %ogg = map { .date => $_ }, %!audios{'ogg'}.flat;
 
-           my ($year, $month, $day) = ~$0, ~$1, ~$2
-               if $date ~~ /
-                   ( \d**4 ) '-' ( \d**2 ) '-' ( \d**2 ) /;
+        for %mp3.kv -> $date, $audio {
+            unless %ogg{$date}:exists {
+                push @!to-ogg, $audio;
+            }
+        }
 
-           my $size = $audio.IO.s; 
+        my @works;
+        for @!to-ogg -> $audio {
+            mkdir $audio.dst unless $audio.dst.IO.d;
+            my $src  = "{$audio.src}/{$audio.name}";
+            my $dst  = "{$audio.dst}/{$audio.rename-file}";
 
-           $save-in.push: $date => LVST::Audio.new(
-               name  => $name,
-               path  => $path,
-               year  => $year,
-               month => $month,
-               day   => $day,
-               size  => $size,
-           );
-       } 
-   }
+            my $proc = Proc::Async.new('mp3-a-ogg.pl6', $src, $dst);
+            push @works, $proc.start;
 
-   method último-programa () {
-       Date.new(%!audios-ogg.keys.sort.tail);
-   }
+            if @works == 2 {
+                await Promise.anyof(@works);
+                @works .= grep({ !$_ });
+            }
+        }
+        await @works;
+    }
 
-   method del-pasado (Date $desde! is copy, Date $hasta! is copy, Bool :$sin-filtro) {
-       if $desde lt $hasta {
-           my @fechas = lazy gather {
-               until $desde eq $hasta {
-                   # sábado y domingo no hay programa
-                   unless $desde.day-of-week == 6|7 { 
-                       take $desde;
-                   }
-                   $desde .= later(:1day);
-               }
-           }
-           @!missing := @fechas;
-       } else {
-           note "'$desde' tiene que ser menor que '$hasta'";
-       }
-   }
-
-   method descargar (Bool :$descarga-directa, Bool :$simular) {
-       chdir "$Config::mp3" or die "$!";
-
-       for @!missing -> Date $date {
-           my Str $base-url  = 'http://s3.schwindt.org/dolina/';
-           my Str $file-name = 'lavenganza_' ~ $date ~ '.mp3?torrent';
-
-           if $descarga-directa {
-               $base-url     = 'https://venganzasdelpasado.com.ar/';
-               $file-name    = 'lavenganza_' ~ $date ~ '.mp3';
-           }
-
-           my $url = $base-url ~ $date.year ~ '/' ~ $file-name;
-           say "simulando: wget $url" if $simular;
-
-           unless $file-name.IO.f {
-               unless $simular {
-                   once { say "Descargando..." }
-                   shell "wget $url";
-                   sleep 3;
-               }
-           }
-       }
-   }
-
-   method mp3-a-ogg () {
-
-       for %!audios-mp3.keys -> $date {
-           if %!audios-ogg{$date}:exists {
-               %!audios-mp3{$date}:delete;
-           }
-       }
-
-       for %!audios-mp3.values -> $audio {
-           my $src  = IO::Spec::Unix.join($, $audio.path, $audio.name);
-           my $dir  = IO::Spec::Unix.join($, $Config::ogg, $audio.year);
-
-           $audio.change-ext;
-           my $dst  = IO::Spec::Unix.join($, $dir, $audio.name);
-
-           mkdir $dir unless $dir.IO.d;
-           my $total-size = 0;
-
-           my @jobs;
-           unless $dst.IO.f {
-               $total-size += $audio.size;
-
-               my $proc = Proc::Async.new('mp3-a-ogg.sh', $src, $dst);
-               push @jobs, $proc.start;
-
-               if @jobs == 3 {
-                   await Promise.anyof(@jobs);
-                   @jobs .= grep({ !$_ });
-               }
-           }
-           say "Convirtiendo a ogg";
-           say "Espacio requerido: { floor($total-size * 1e-6) } MB";
-           await @jobs;
-       }
-   }
-
-   submethod BUILD () {
-       self!buscar-audios($Config::ogg, %!audios-ogg);
-       self!buscar-audios($Config::mp3, %!audios-mp3);
-   }
+    submethod BUILD {
+        self.buscar-audios($Config::mp3);
+        self.buscar-audios($Config::ogg);
+    }
 }
+

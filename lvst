@@ -22,8 +22,6 @@ sub MAIN (
     Str $desde-fecha?,
     Str $hasta-fecha?,
     Bool :$nono,
-    Bool :$descarga-directa,
-    Bool :$no-filtrar,
     Bool :$convertir-a-ogg)
 {
     my $venganzas = LVST::Venganzas.new;
@@ -37,19 +35,9 @@ sub MAIN (
               !! Date.today;
 
     $venganzas.mp3-a-ogg if $convertir-a-ogg;
-    $venganzas.del-pasado($desde, $hasta) unless $nono;
+    $venganzas.del-pasado($desde, $hasta);
 
-    $no-filtrar
-        ?? $venganzas.del-pasado($desde, $hasta, :sin-filtro)
-        !! $venganzas.del-pasado($desde, $hasta);
-
-    if $nono {
-        $descarga-directa
-            ?? $venganzas.descargar(:simular, :descarga-directa)
-            !! $venganzas.descargar(:simular);
-    } else {
-        $descarga-directa
-            ?? $venganzas.descargar(:descarga-directa)
-            !! $venganzas.descargar;
-    }
+    $nono
+        ?? $venganzas.descargar(:simular)
+        !! $venganzas.descargar;
 }
